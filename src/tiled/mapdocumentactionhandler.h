@@ -34,11 +34,12 @@ class ObjectTemplate;
 
 class MapDocument;
 
+#include "tilededitor_global.h"
 /**
  * The map document action handler deals with most basic actions that can be
  * performed on a MapDocument.
  */
-class MapDocumentActionHandler : public QObject
+class TILED_EDITOR_EXPORT MapDocumentActionHandler : public QObject
 {
     Q_OBJECT
 

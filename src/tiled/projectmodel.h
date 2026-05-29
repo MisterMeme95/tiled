@@ -49,7 +49,7 @@ struct FolderEntry
     bool isDir = false;
 };
 
-class ProjectModel : public QAbstractItemModel
+class TILED_EDITOR_EXPORT ProjectModel : public QAbstractItemModel
 {
     Q_OBJECT
 

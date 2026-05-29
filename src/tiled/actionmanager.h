@@ -21,7 +21,7 @@
 #pragma once
 
 #include "id.h"
-
+#include "tilededitor_global.h"
 #include <QHash>
 #include <QObject>
 #include <QVector>
@@ -48,7 +48,7 @@ constexpr char tilesetViewTiles[] = "TilesetView.Tiles";
 /**
  * Manager of global actions.
  */
-class ActionManager : public QObject
+class TILED_EDITOR_EXPORT ActionManager : public QObject
 {
     Q_OBJECT
 

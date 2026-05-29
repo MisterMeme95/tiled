@@ -2110,6 +2110,7 @@ void MainWindow::updateRecentFilesMenu()
 
 bool MainWindow::addRecentProjectsActions(QMenu *menu) const
 {
+#ifndef __EMSCRIPTEN__
     const QStringList files = Preferences::instance()->recentProjects();
 
     for (const QString &file : files) {
@@ -2120,6 +2121,7 @@ bool MainWindow::addRecentProjectsActions(QMenu *menu) const
     }
 
     return !files.isEmpty();
+#endif
 }
 
 void MainWindow::updateRecentProjectsMenu()

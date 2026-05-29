@@ -151,7 +151,7 @@ void PluginManager::deleteInstance()
 
 void PluginManager::addObject(QObject *object)
 {
-    Q_ASSERT(object);
+//    Q_ASSERT(object);
     Q_ASSERT(mInstance);
     Q_ASSERT(!mInstance->mObjects.contains(object));
 

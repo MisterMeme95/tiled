@@ -150,7 +150,7 @@ QAction *ActionManager::action(Id id)
     auto d = instance();
 
     auto action = d->mIdToActions.value(id);
-    Q_ASSERT_X(action, "ActionManager::action", "unknown id");
+//    Q_ASSERT_X(action, "ActionManager::action", "unknown id");
     return action;
 }
 

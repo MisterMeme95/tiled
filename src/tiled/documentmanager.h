@@ -58,19 +58,19 @@ class WorldDocument;
 /**
  * This class controls the open documents.
  */
-class DocumentManager : public QObject
+class TILED_EDITOR_EXPORT DocumentManager : public QObject
 {
     Q_OBJECT
 
     Q_PROPERTY(Document *currentDocument READ currentDocument NOTIFY currentDocumentChanged)
 
-    DocumentManager(QObject *parent = nullptr);
     ~DocumentManager() override;
 
     friend class MainWindow;
     friend class Document;      // for file watching
 
 public:
+    DocumentManager(QObject *parent = nullptr);
     static DocumentManager *instance();
     static DocumentManager *maybeInstance();
 

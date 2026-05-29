@@ -1,64 +1,28 @@
-cmake_minimum_required(VERSION 3.10)
-# Set C++ standard
+cmake_minimum_required(VERSION 3.20)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-include_directories("C:/Qt/6.9.1/mingw_64/include")
-include_directories("C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1/QtGui")
 
-# Compiler options
-if(MSVC)
-    add_compile_options(/permissive-)
-endif()
-#add_compile_options(-Wno-cpp)
-
-# Definitions based on conditions
-add_compile_definitions(
-        TILED_EDITOR_LIBRARY
-        TILED_VERSION="${PROJECT_VERSION}"
-       # QT_DISABLE_DEPRECATED_UP_TO=0x050F00
-        QT_NO_DEPRECATED_WARNINGS
-        QT_NO_CAST_FROM_ASCII
-        QT_NO_CAST_TO_ASCII
-        QT_NO_FOREACH
-        QT_NO_URL_CAST_FROM_STRING
-        _USE_MATH_DEFINES
-
+find_package(Qt6 REQUIRED COMPONENTS
+        Core
+        CorePrivate
+        Widgets
+        Concurrent
+        Qml
+        Svg
+        Gui
+        GuiPrivate
+        OpenGLWidgets
 )
-#add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050000)  # Assuming you want to disable deprecations up to Qt 6.5.0
 
-
-if(SNAPSHOT)
-    add_compile_definitions(TILED_SNAPSHOT)
-endif()
-
-if(WINDOWS_LAYOUT)
-    add_compile_definitions(TILED_WINDOWS_LAYOUT)
-endif()
-
-# Find required packages
-find_package(Qt6 COMPONENTS Core Widgets Concurrent  QML Svg REQUIRED)
-if(WIN32)
-    find_package(Qt6 COMPONENTS Gui REQUIRED)
-endif()
 if(UNIX AND NOT APPLE)
-    find_package(Qt6DBus)
+    find_package(Qt6 COMPONENTS DBus)
 endif()
 
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-# Sentry integration (if enabled)
-if(SENTRY)
-    include_directories("../../sentry-native/install/include")
-    link_directories("../../sentry-native/install/lib")
-    add_compile_definitions(TILED_SENTRY)
-endif()
-include_directories("../libtiled")
-
-# Source files
 set(SOURCE_FILES
         aboutdialog.cpp
         aboutdialog.h
@@ -441,6 +405,7 @@ set(SOURCE_FILES
         scriptmanager.h
         scriptmodule.cpp
         scriptmodule.h
+
         scriptprocess.cpp
         scriptprocess.h
         selectionrectangle.cpp
@@ -563,69 +528,83 @@ set(SOURCE_FILES
         worldmovemaptool.h
         zoomable.cpp
         zoomable.h
+        expressionspinbox.cpp
+
+        #        expressionevaluator.cpp
+        worldpropertiesdialog.cpp
+        tilehighlightitem.cpp
+        createcapsuleobjecttool.cpp
+        scriptpropertytype.cpp
+        scriptsession.cpp
+        listedit.cpp
 )
 
+if(EMSCRIPTEN)
+    add_library(tilededitor STATIC ${SOURCE_FILES})
+else()
+    add_library(tilededitor SHARED ${SOURCE_FILES})
+endif()
 
-find_package(Qt6 REQUIRED COMPONENTS OpenGLWidgets)
-
-
-# Create the dynamic library
-add_library(tilededitor SHARED ${SOURCE_FILES})
-#target_include_directories(tilededitor PRIVATE ../qtsingleapplication/src)
-#target_include_directories(tilededitor PRIVATE "/c/Qt/6.8.0/mingw_64/include/QtGui/6.8.0/QtGui")
-#target_include_directories(tilededitor PRIVATE "/c/Qt/6.8.0/mingw_64/include/QtGui/6.8.0/QtGui/qpa")
 target_include_directories(tilededitor PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ../libtiled
         ../qtsingleapplication/src
-        C:/Qt/6.9.1/mingw_64/include
-        C:/Qt/6.9.1/mingw_64/include/QtCore
-        C:/Qt/6.9.1/mingw_64/include/QtCore/6.9.1
-        C:/Qt/6.9.1/mingw_64/include/QtCore/6.9.1/QtCore/private
-        C:/Qt/6.9.1/mingw_64/include/QtGui
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1/QtGui
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1/QtGui/private
 )
 
-include_directories(tilededitor PRIVATE
-        ../qtsingleapplication/src
-        C:/Qt/6.9.1/mingw_64/include
-        C:/Qt/6.9.1/mingw_64/include/QtCore
-        C:/Qt/6.9.1/mingw_64/include/QtCore/6.9.1
-        C:/Qt/6.9.1/mingw_64/include/QtCore/6.9.1/QtCore/private
-        C:/Qt/6.9.1/mingw_64/include/QtGui
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1/QtGui
-        C:/Qt/6.9.1/mingw_64/include/QtGui/6.9.1/QtGui/private
+target_compile_definitions(tilededitor PRIVATE
+        TILED_EDITOR_LIBRARY
+        TILED_VERSION="${PROJECT_VERSION}"
+        QT_NO_DEPRECATED_WARNINGS
+        QT_NO_CAST_FROM_ASCII
+        QT_NO_CAST_TO_ASCII
+        QT_NO_FOREACH
+        QT_NO_URL_CAST_FROM_STRING
+        _USE_MATH_DEFINES
 )
 
-get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-foreach(dir ${dirs})
-    message(STATUS "Include dir='${dir}'")
-endforeach()
-# Linking dependencies
-target_link_libraries(tilededitor
+if(SNAPSHOT)
+    target_compile_definitions(tilededitor PRIVATE TILED_SNAPSHOT)
+endif()
+
+if(WINDOWS_LAYOUT)
+    target_compile_definitions(tilededitor PRIVATE TILED_WINDOWS_LAYOUT)
+endif()
+
+if(MSVC)
+    target_compile_options(tilededitor PRIVATE /permissive-)
+endif()
+
+if(SENTRY)
+    target_compile_definitions(tilededitor PRIVATE TILED_SENTRY)
+
+    target_include_directories(tilededitor PRIVATE
+            "${CMAKE_SOURCE_DIR}/../../sentry-native/install/include"
+    )
+
+    target_link_directories(tilededitor PRIVATE
+            "${CMAKE_SOURCE_DIR}/../../sentry-native/install/lib"
+    )
+endif()
+
+target_link_libraries(tilededitor PRIVATE
         tiled
         Qt6::Core
+        Qt6::CorePrivate
         Qt6::Widgets
         Qt6::Concurrent
         Qt6::Qml
         Qt6::Svg
         Qt6::Gui
+        Qt6::GuiPrivate
         Qt6::OpenGLWidgets
         qtsingleapplication
 )
 
-#if(Qt5DBus_FOUND)
-#    target_link_libraries(tilededitor Qt5::DBus)
-#    add_compile_definitions(TILED_ENABLE_DBUS)
-#endif()
+if(UNIX AND NOT APPLE AND TARGET Qt6::DBus)
+    target_link_libraries(tilededitor PRIVATE Qt6::DBus)
+    target_compile_definitions(tilededitor PRIVATE TILED_ENABLE_DBUS)
+endif()
 
-# Conditional linking based on OS
-#if(WIN32)
-#    target_link_libraries(tilededitor Qt5::GuiPrivate)
-#endif()
-
-# Installation rules
 if(NOT APPLE)
     install(TARGETS tilededitor LIBRARY DESTINATION ${LIB_DIR})
 endif()

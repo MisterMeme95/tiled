@@ -58,10 +58,11 @@ NoEditorWidget::NoEditorWidget(QWidget *parent) :
     connect(preferences, &Preferences::recentProjectsChanged, this, &NoEditorWidget::updateRecentProjectsMenu);
 
     connect(StyleHelper::instance(), &StyleHelper::styleApplied, this, &NoEditorWidget::adjustToStyle);
-
+#ifndef __EMSCRIPTEN__
     updateRecentProjectsMenu();
+#endif
     adjustToStyle();
-    retranslateUi();
+//    retranslateUi();
 }
 
 NoEditorWidget::~NoEditorWidget()

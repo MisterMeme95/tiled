@@ -40,7 +40,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QtPlugin>
-
+#ifdef Q_OS_WASM
+#include <emscripten/val.h>
+// Perform JS calls here
+#endif
 #include <memory>
 
 #ifdef Q_OS_WIN

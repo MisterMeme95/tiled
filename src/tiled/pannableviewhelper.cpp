@@ -39,8 +39,8 @@ class SpaceBarEventFilter : public QObject
 public:
     static SpaceBarEventFilter *instance()
     {
-        static SpaceBarEventFilter instance;
-        return &instance;
+        static SpaceBarEventFilter *inst = new SpaceBarEventFilter();
+        return inst;
     }
 
     static bool isSpacePressed()
@@ -53,13 +53,19 @@ signals:
 
 private:
     SpaceBarEventFilter(QObject *parent = nullptr)
-        : QObject(parent)
+            : QObject(parent)
     {
-        // Install on MainWindow to detect window handle changes
-        MainWindow::instance()->installEventFilter(this);
+        // 1. Safely check if Tiled's native MainWindow exists
+        if (MainWindow::instance()) {
+            MainWindow::instance()->installEventFilter(this);
+        }
+            // 2. THE FIX: Fallback to your DreamForge QApplication!
+        else if (qApp) {
+            qApp->installEventFilter(this);
+        }
 
-        // Install on window handle to detect Space key state changes
-        installOnWindowHandle();
+        // Attempt to hook the window handle
+//        installOnWindowHandle();
     }
 
     bool eventFilter(QObject *watched, QEvent *event) override

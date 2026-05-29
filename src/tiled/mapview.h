@@ -43,7 +43,7 @@ class Zoomable;
  *
  * @see MapScene
  */
-class MapView : public QGraphicsView
+class TILED_EDITOR_EXPORT MapView : public QGraphicsView
 {
     Q_OBJECT
 

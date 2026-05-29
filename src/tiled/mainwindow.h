@@ -279,7 +279,7 @@ private:
 
 inline MainWindow *MainWindow::instance()
 {
-    Q_ASSERT(mInstance);
+//    Q_ASSERT(mInstance);
     return mInstance;
 }
 

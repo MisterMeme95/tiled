@@ -67,7 +67,7 @@ class WangBrush;
 class WangDock;
 class Zoomable;
 
-class MapEditor final : public Editor
+class TILED_EDITOR_EXPORT MapEditor : public Editor
 {
     Q_OBJECT
 

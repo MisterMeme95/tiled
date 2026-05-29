@@ -50,6 +50,8 @@ set(SOURCE_FILES
         hex.h
         hexagonalrenderer.cpp
         hexagonalrenderer.h
+        obliquerenderer.cpp
+        obliquerenderer.h
         imagecache.cpp
         imagecache.h
         imagelayer.cpp
@@ -127,13 +129,19 @@ set(SOURCE_FILES
         wangset.h
         world.cpp
         world.h
-
 )
 find_package(ZLIB REQUIRED)
 
-# Create the dynamic library
-add_library(tiled SHARED ${SOURCE_FILES})
-
+## Create the dynamic library
+#add_library(tiled STATIC ${SOURCE_FILES})
+# Create the library conditionally based on the target platform
+if(EMSCRIPTEN)
+    # WebAssembly needs everything statically linked into the final .wasm binary
+    add_library(tiled STATIC ${SOURCE_FILES})
+else()
+    # Windows/Desktop expects a .dll because of the Tiled export macros
+    add_library(tiled SHARED ${SOURCE_FILES})
+endif()
 # Link libraries
 target_link_libraries(tiled
         Qt6::Gui

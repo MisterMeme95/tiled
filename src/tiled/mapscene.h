@@ -51,7 +51,7 @@ class ObjectGroupItem;
 /**
  * A graphics scene that represents the contents of a map.
  */
-class MapScene : public QGraphicsScene
+class TILED_EDITOR_EXPORT MapScene : public QGraphicsScene
 {
     Q_OBJECT
 

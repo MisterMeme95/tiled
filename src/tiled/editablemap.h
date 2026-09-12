@@ -36,7 +36,7 @@ class EditableSelectedArea;
 class EditableTileLayer;
 class EditableTileset;
 
-class EditableMap final : public EditableAsset
+class TILED_EDITOR_EXPORT EditableMap final : public EditableAsset
 {
     Q_OBJECT
 

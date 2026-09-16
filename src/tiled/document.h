@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
 #include "properties.h"
 
 #include <QDateTime>
@@ -44,7 +45,7 @@ class EditableAsset;
 /**
  * Keeps track of a file and its undo history.
  */
-class Document : public QObject,
+class TILED_EDITOR_EXPORT Document : public QObject,
                  public QEnableSharedFromThis<Document>
 {
     Q_OBJECT

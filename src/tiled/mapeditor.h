@@ -135,6 +135,14 @@ public:
 
     Q_INVOKABLE AbstractTool *tool(const QByteArray &id) const;
 
+    /*
+     * So a tool defined outside this library can register itself. Everything
+     * needed to do that - AbstractTool, ToolManager - is exported for the same
+     * reason; the alternative was carrying the tool's whole implementation in
+     * this tree purely to reach a private member.
+     */
+    ToolManager *toolManager() const { return mToolManager; }
+
 signals:
     void currentBrushChanged();
     void currentWangSetChanged();

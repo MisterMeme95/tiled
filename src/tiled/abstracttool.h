@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
 #include "changeevents.h"
 #include "id.h"
 #include "layer.h"
@@ -57,7 +58,7 @@ class ToolManager;
  * A tool will usually add one or more QGraphicsItems to the scene in order to
  * represent it to the user.
  */
-class AbstractTool : public QObject
+class TILED_EDITOR_EXPORT AbstractTool : public QObject
 {
     Q_OBJECT
 

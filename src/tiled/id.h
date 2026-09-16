@@ -20,12 +20,14 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
+
 #include <QLatin1String>
 #include <QMetaType>
 
 namespace Tiled {
 
-class Id
+class TILED_EDITOR_EXPORT Id
 {
 public:
     Id() : mId(0) {}

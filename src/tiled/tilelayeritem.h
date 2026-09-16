@@ -42,6 +42,16 @@ public:
      */
     TileLayerItem(TileLayer *layer, MapDocument *mapDocument, QGraphicsItem *parent = nullptr);
 
+    /*
+     * So this item can be recognised with qgraphicsitem_cast rather than
+     * dynamic_cast. A tool living outside this library cannot dynamic_cast to
+     * it - that needs the class's typeinfo exported - and MapObjectItem
+     * already identifies itself this way. UserType + 1, + 2 and + 3 are taken
+     * by MapObjectItem, PointHandle and MapItem.
+     */
+    enum { Type = UserType + 4 };
+    int type() const override { return Type; }
+
     TileLayer *tileLayer() const;
 
     /**

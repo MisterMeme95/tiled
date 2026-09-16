@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
 #include "id.h"
 #include "layer.h"
 
@@ -43,7 +44,7 @@ class MapDocument;
  * actions are put into a QActionGroup to make sure only one tool can be
  * selected at a time.
  */
-class ToolManager : public QObject
+class TILED_EDITOR_EXPORT ToolManager : public QObject
 {
     Q_OBJECT
     Q_DISABLE_COPY(ToolManager)

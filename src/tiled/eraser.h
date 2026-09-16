@@ -42,21 +42,12 @@ public:
     void languageChanged() override;
 
 protected:
-    void keyPressed(QKeyEvent *event) override;
     void tilePositionChanged(QPoint tilePos) override;
     void updateStatusInfo() override;
 
 private:
     void doErase(bool continuation);
     QRect eraseArea() const;
-
-    /*
-     * The square the eraser covers at a given tile. Shared by eraseArea(),
-     * which drives the preview, and by the line interpolation in doErase() -
-     * they have to agree or a fast drag erases a different shape from the one
-     * the cursor showed.
-     */
-    QRect eraseSquare(QPoint tilePos) const;
 
     enum Mode {
         Nothing,
@@ -66,13 +57,6 @@ private:
 
     Mode mMode = Nothing;
     bool mAllLayers = false;
-
-    /*
-     * Erase area in TILES, square and odd-centred. [ and ] change it.
-     * Everything follows from eraseArea(), the preview included, so there is
-     * nothing else to keep in step.
-     */
-    int mSize = 1;
     QPoint mLastTilePos;
     QPoint mStart;
 };

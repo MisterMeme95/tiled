@@ -27,8 +27,6 @@
 #include "painttilelayer.h"
 
 #include <QCoreApplication>
-#include <QKeyEvent>
-#include <QtMath>
 
 using namespace Tiled;
 
@@ -99,35 +97,6 @@ void Eraser::modifiersChanged(Qt::KeyboardModifiers modifiers)
     mAllLayers = modifiers & Qt::ShiftModifier;
 }
 
-void Eraser::keyPressed(QKeyEvent *event)
-{
-    /*
-     * [ and ] resize, the way every painting application spells it. Handled
-     * here rather than as an application shortcut because the tool owns the
-     * size, and MapScene::keyPressEvent() already forwards to whichever tool
-     * is selected - so the keys only mean this while the eraser is active.
-     */
-    int size = mSize;
-
-    switch (event->key()) {
-    case Qt::Key_BracketLeft:   size = qMax(1, mSize - 1); break;
-    case Qt::Key_BracketRight:  size = qMin(64, mSize + 1); break;
-    default:
-        AbstractTileTool::keyPressed(event);
-        return;
-    }
-
-    if (size != mSize) {
-        mSize = size;
-
-        /* The preview reads eraseArea(), so it only needs telling to re-read. */
-        brushItem()->setTileRegion(eraseArea());
-        updateStatusInfo();
-    }
-
-    event->accept();
-}
-
 void Eraser::languageChanged()
 {
     setName(tr("Eraser"));
@@ -139,15 +108,9 @@ void Eraser::doErase(bool continuation)
     QPoint tilePos = tilePosition();
 
     if (continuation) {
-        /*
-         * The full square at every interpolated point, not a single tile.
-         * These fill the gaps the mouse skipped over, so they have to be the
-         * same shape as the one being dragged - otherwise a fast drag leaves a
-         * one-tile trail with a full-size square only where it stopped.
-         */
         const QVector<QPoint> points = pointsOnLine(mLastTilePos, tilePos);
         for (const QPoint &p : points)
-            globalEraseRegion |= QRegion(eraseSquare(p));
+            globalEraseRegion |= QRegion(p.x(), p.y(), 1, 1);
     }
     mLastTilePos = tilePos;
 
@@ -169,21 +132,7 @@ QRect Eraser::eraseArea() const
 #endif
     }
 
-    return eraseSquare(tilePosition());
-}
-
-QRect Eraser::eraseSquare(QPoint tilePos) const
-{
-    /*
-     * Centred on the tile, so growing the eraser does not make it drift off
-     * the one being pointed at. An even size cannot be centred exactly; the
-     * extra row and column go right and down, which is the direction the
-     * bottom-left anchoring of everything else already leans.
-     */
-    const int size = qMax(1, mSize);
-    const int half = (size - 1) / 2;
-
-    return QRect(tilePos - QPoint(half, half), QSize(size, size));
+    return QRect(tilePosition(), QSize(1, 1));
 }
 
 void Eraser::updateStatusInfo()
@@ -201,21 +150,6 @@ void Eraser::updateStatusInfo()
                           .arg(pos.y())
                           .arg(rect.width())
                           .arg(rect.height()));
-        return;
-    }
-
-    /*
-     * The size is otherwise invisible until something is erased, and the base
-     * shows only the cursor position. Reported only when it is not 1, so the
-     * ordinary case reads exactly as it always did.
-     */
-    if (mSize > 1) {
-        const QPoint pos = tilePosition();
-
-        setStatusInfo(tr("%1, %2 - Eraser size %3 ([ and ] to change)")
-                          .arg(pos.x())
-                          .arg(pos.y())
-                          .arg(mSize));
         return;
     }
 

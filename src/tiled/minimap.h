@@ -24,12 +24,14 @@
 #include "minimaprenderer.h"
 
 #include <QFrame>
+#include <QHash>
 #include <QImage>
 #include <QTimer>
 
 namespace Tiled {
 
 class MapDocument;
+class MapObject;
 
 class MiniMap : public QFrame
 {
@@ -69,6 +71,35 @@ private:
     bool mMouseMoveCursorState;
     bool mRedrawMapImage;
     MiniMapRenderer::RenderFlags mRenderFlags;
+
+    /*
+     * What changed since the image was last drawn, in map pixel coordinates,
+     * and whether the whole thing has to be redrawn instead.
+     *
+     * A full render walks every cell of every tile layer and draws every
+     * object, which on a large map is a quarter of a second - and it used to
+     * happen on every single undo command, which is what made editing feel
+     * laggy. Accumulating what actually changed lets renderMapToImage() patch
+     * the image it already has.
+     *
+     * mFullRedraw is the safe answer and everything unrecognised falls back to
+     * it. An empty dirty rectangle means a full render as well, not a skipped
+     * one, which is what makes an edit emitting no change event we model
+     * correct rather than invisible.
+     */
+    QRectF mDirtyMapRect;
+    bool mFullRedraw = true;
+
+    /*
+     * Where each object was when the image was last drawn.
+     *
+     * MapObjectsChanged arrives AFTER the move, so the event alone says where
+     * an object is now and not where it was - and repainting only the new
+     * position leaves the old one smeared across the image. This is the other
+     * half of that rectangle. Refilled on every full render, which is what
+     * makes the first move of any object correct.
+     */
+    QHash<const MapObject *, QRectF> mObjectBounds;
 
     QRect viewportRect() const;
     QPointF mapToScene(QPointF p) const;

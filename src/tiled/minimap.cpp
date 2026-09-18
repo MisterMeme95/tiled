@@ -21,12 +21,16 @@
 
 #include "minimap.h"
 
+#include "changeevents.h"
 #include "documentmanager.h"
 #include "map.h"
 #include "mapdocument.h"
+#include "mapobject.h"
 #include "maprenderer.h"
 #include "mapscene.h"
 #include "mapview.h"
+#include "objectgroup.h"
+#include "tilelayer.h"
 #include "utils.h"
 #include "zoomable.h"
 
@@ -67,15 +71,114 @@ void MiniMap::setMapDocument(MapDocument *map)
     if (mMapDocument) {
         mMapDocument->disconnect(this);
 
+        /*
+         * The undo stack is a separate QObject, so the disconnect above does
+         * not reach it. Left connected, the previous document's stack goes on
+         * scheduling updates for a map this widget no longer shows - and since
+         * those arrive with no dirty rectangle they each cost a full render.
+         */
+        mMapDocument->undoStack()->disconnect(this);
+
         if (MapView *mapView = dm->viewForDocument(mMapDocument))
             mapView->disconnect(this);
     }
 
     mMapDocument = map;
 
+    /* A different map shares nothing with the one that was on screen. */
+    mObjectBounds.clear();
+    mDirtyMapRect = QRectF();
+    mFullRedraw = true;
+
     if (mMapDocument) {
         connect(mMapDocument->undoStack(), &QUndoStack::indexChanged,
                 this, &MiniMap::scheduleMapImageUpdate);
+
+        /*
+         * Tile edits. regionChanged is what MapItem repaints from too, and it
+         * carries exactly the cells that changed.
+         */
+        connect(mMapDocument, &MapDocument::regionChanged, this,
+                [this] (const QRegion &region, TileLayer *tileLayer) {
+            if (region.isEmpty() || !tileLayer || !mMapDocument)
+                return;
+
+            QRectF rect = mMapDocument->renderer()->boundingRect(region.boundingRect());
+
+            /*
+             * A tile taller than its cell paints above it, so the pixels that
+             * changed reach further than the cells that changed. drawMargins is
+             * how far any tile in this layer can hang out of its cell; growing
+             * the rectangle by it on every side is generous in two directions
+             * and exactly right in the other two.
+             */
+            const QMargins margins = tileLayer->drawMargins();
+            rect.adjust(-margins.left(), -margins.top(),
+                        margins.right(), margins.bottom());
+
+            mDirtyMapRect |= rect.translated(tileLayer->totalOffset());
+        });
+
+        /* Objects, and the fallback for everything else. */
+        connect(mMapDocument, &Document::changed, this,
+                [this] (const ChangeEvent &change) {
+            if (!mMapDocument)
+                return;
+
+            const MapRenderer *renderer = mMapDocument->renderer();
+
+            switch (change.type) {
+            case ChangeEvent::MapObjectsAdded:
+            case ChangeEvent::MapObjectsChanged:
+            case ChangeEvent::MapObjectsAboutToBeRemoved: {
+                /*
+                 * AboutToBeRemoved rather than Removed, because the objects are
+                 * still in their group here and can still say where they are.
+                 */
+                const bool leaving =
+                        change.type == ChangeEvent::MapObjectsAboutToBeRemoved;
+                auto &e = static_cast<const MapObjectsEvent&>(change);
+
+                for (const MapObject *object : e.mapObjects) {
+                    const ObjectGroup *group = object->objectGroup();
+                    const QPointF offset = group ? group->totalOffset() : QPointF();
+                    const QRectF now =
+                            renderer->boundingRect(object).translated(offset);
+
+                    /* Where it was, so a move does not leave the old copy. */
+                    mDirtyMapRect |= mObjectBounds.value(object);
+                    mDirtyMapRect |= now;
+
+                    if (leaving)
+                        mObjectBounds.remove(object);
+                    else
+                        mObjectBounds.insert(object, now);
+                }
+                break;
+            }
+
+            /*
+             * The singular forms say the same thing as the plural ones that
+             * bracket them, so acting on both would only dirty twice.
+             */
+            case ChangeEvent::MapObjectAboutToBeAdded:
+            case ChangeEvent::MapObjectAdded:
+            case ChangeEvent::MapObjectAboutToBeRemoved:
+            case ChangeEvent::MapObjectRemoved:
+            case ChangeEvent::MapObjectsRemoved:
+                break;
+
+            /*
+             * Layer visibility, opacity, offsets, the map itself, a tileset
+             * reloading, a class colour changing - none of these have a
+             * rectangle worth computing, and all of them are rare enough that
+             * a full render is the honest answer.
+             */
+            default:
+                mFullRedraw = true;
+                break;
+            }
+        });
 
         if (MapView *mapView = dm->viewForDocument(mMapDocument))
             connect(mapView, &MapView::viewRectChanged, this, [this] { update(); });
@@ -185,12 +288,44 @@ void MiniMap::renderMapToImage()
     if (mMapImage.size() != imageSize) {
         mMapImage = QImage(imageSize, QImage::Format_ARGB32_Premultiplied);
         updateImageRect();
+
+        /* A fresh buffer holds nothing, so there is nothing to patch. */
+        mFullRedraw = true;
     }
 
     if (imageSize.isEmpty())
         return;
 
-    miniMapRenderer.renderToImage(mMapImage, mRenderFlags);
+    /*
+     * An empty dirty rectangle asks for a full render, which is what makes
+     * this safe by default: anything that failed to report a rectangle gets
+     * redrawn rather than silently skipped.
+     */
+    miniMapRenderer.renderToImage(mMapImage, mRenderFlags,
+                                  mFullRedraw ? QRectF() : mDirtyMapRect);
+
+    if (mFullRedraw) {
+        /*
+         * The image now matches the map exactly, so this is the one moment
+         * where every object's position can be recorded cheaply enough to be
+         * worth it - and having it recorded is what lets the FIRST move of any
+         * object repaint the square it left behind.
+         */
+        mObjectBounds.clear();
+
+        const MapRenderer *renderer = mMapDocument->renderer();
+        for (const Layer *layer : mMapDocument->map()->objectGroups()) {
+            auto objectGroup = static_cast<const ObjectGroup*>(layer);
+            const QPointF offset = objectGroup->totalOffset();
+
+            for (const MapObject *object : objectGroup->objects())
+                mObjectBounds.insert(object,
+                                     renderer->boundingRect(object).translated(offset));
+        }
+    }
+
+    mFullRedraw = false;
+    mDirtyMapRect = QRectF();
 }
 
 void MiniMap::centerViewOnLocalPixel(const QPointF &centerPos, int delta)

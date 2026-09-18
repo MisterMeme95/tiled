@@ -33,6 +33,7 @@
 #include "tiled_global.h"
 
 #include <QImage>
+#include <QRect>
 
 #include <functional>
 #include <memory>
@@ -72,7 +73,26 @@ public:
 
     QImage render(QSize size, RenderFlags renderFlags) const;
 
-    void renderToImage(QImage &image, RenderFlags renderFlags) const;
+    /**
+     * Renders the map into \a image.
+     *
+     * With a null \a dirtyMapRect the whole image is cleared and the whole map
+     * drawn. Pass a rectangle in MAP PIXEL coordinates to repaint only that
+     * patch: the rest of the image is left exactly as it was, so the caller
+     * must be handing back the same image it got last time.
+     *
+     * This exists because the mini-map re-renders on every undo command, and a
+     * full render walks every cell of every tile layer and draws every object.
+     * On a 700x650 map with five layers that is 1.45 million cell lookups and
+     * 10,000 objects for a single tile change.
+     *
+     * The rectangle is inflated here, not by the caller, because it has to
+     * cover whole DEVICE pixels of the image and only this function knows the
+     * scale. At mini-map scale one tile is well under a pixel, so a patch the
+     * size of the edit would clip to nothing and draw nothing at all.
+     */
+    void renderToImage(QImage &image, RenderFlags renderFlags,
+                       const QRectF &dirtyMapRect = QRectF()) const;
 
 private:
     const Map *mMap;

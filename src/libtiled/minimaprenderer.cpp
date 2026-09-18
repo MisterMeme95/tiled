@@ -120,7 +120,8 @@ static void extendMapRect(QRect &mapBoundingRect, const MapRenderer &renderer)
     mapBoundingRect = rect.toAlignedRect();
 }
 
-void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags) const
+void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags,
+                                    const QRectF &dirtyMapRect) const
 {
     if (!mMap)
         return;
@@ -147,10 +148,31 @@ void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags) cons
     const qreal scale = qMin(static_cast<qreal>(image.width()) / mapSize.width(),
                              static_cast<qreal>(image.height()) / mapSize.height());
 
-    if (renderFlags.testFlag(DrawBackground) && mMap->backgroundColor().isValid())
-        image.fill(mMap->backgroundColor());
-    else
-        image.fill(Qt::transparent);
+    const QColor clearColor =
+            (renderFlags.testFlag(DrawBackground) && mMap->backgroundColor().isValid())
+            ? mMap->backgroundColor()
+            : QColor(Qt::transparent);
+
+    /*
+     * Inflate the patch so it covers whole device pixels of the image.
+     *
+     * At mini-map scale a 32px tile lands on a fraction of a pixel, so a patch
+     * the size of the edit clips to nothing and draws nothing. Two device
+     * pixels of slack on each side also means the neighbouring tiles that bleed
+     * into those pixels get redrawn, which is what stops a seam forming along
+     * the edge of the patch under SmoothPixmapTransform.
+     */
+    QRectF patch;
+    if (!dirtyMapRect.isEmpty() && scale > 0) {
+        const qreal slack = 2 / scale;
+        patch = dirtyMapRect.adjusted(-slack, -slack, slack, slack)
+                .intersected(QRectF(mapBoundingRect));
+    }
+
+    const bool incremental = !patch.isEmpty();
+
+    if (!incremental)
+        image.fill(clearColor);
 
     QPainter painter(&image);
     painter.setRenderHints(QPainter::SmoothPixmapTransform, renderFlags.testFlag(SmoothPixmapTransform));
@@ -166,6 +188,19 @@ void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags) cons
 
     mRenderer->setPainterScale(scale);
 
+    /*
+     * The painter is now in map pixel coordinates, so the patch can be used as
+     * a clip directly. Source composition rather than SourceOver, because the
+     * old contents of the patch have to go - drawing over them would stack the
+     * new state on top of the state it replaces.
+     */
+    if (incremental) {
+        painter.setClipRect(patch);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.fillRect(patch, clearColor);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    }
+
     LayerIterator iterator(mMap);
     while (const Layer *layer = iterator.next()) {
         if (visibleLayersOnly && layer->isHidden())
@@ -178,13 +213,21 @@ void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags) cons
         painter.setOpacity(layerOpacity);
         painter.translate(offset);
 
+        /*
+         * Everything below draws in layer-local coordinates, since the layer
+         * offset has just been folded into the painter. The patch is in map
+         * coordinates, so it has to come back the other way to be compared
+         * against anything a layer reports about itself.
+         */
+        const QRectF layerPatch = incremental ? patch.translated(-offset) : QRectF();
+
         switch (layer->layerType()) {
         case Layer::TileLayerType: {
             if (drawTileLayers) {
                 painter.setCompositionMode(compositionMode);
 
                 const TileLayer *tileLayer = static_cast<const TileLayer*>(layer);
-                mRenderer->drawTileLayer(&painter, tileLayer);
+                mRenderer->drawTileLayer(&painter, tileLayer, layerPatch);
             }
             break;
         }
@@ -193,6 +236,26 @@ void MiniMapRenderer::renderToImage(QImage &image, RenderFlags renderFlags) cons
             if (drawObjects) {
                 const ObjectGroup *objectGroup = static_cast<const ObjectGroup*>(layer);
                 QList<MapObject*> objects = objectGroup->objects();
+
+                /*
+                 * Discard what the patch does not touch BEFORE sorting.
+                 *
+                 * The clip would discard these anyway, but only after the
+                 * painter state changes and the pixmap draw have been paid for
+                 * - drawMapObject constructs a CellRenderer per object, so
+                 * every one of them is its own drawPixmapFragments call.
+                 *
+                 * Filtering first also means the sort below runs on the few
+                 * survivors instead of on all 10,000, and the list detaches at
+                 * a fraction of the size. objects() hands back a const
+                 * reference and QList is implicitly shared, so the copy above
+                 * costs nothing until something here writes to it.
+                 */
+                if (incremental) {
+                    objects.removeIf([&] (const MapObject *object) {
+                        return !mRenderer->boundingRect(object).intersects(layerPatch);
+                    });
+                }
 
                 if (objectGroup->drawOrder() == ObjectGroup::TopDownOrder)
                     std::stable_sort(objects.begin(), objects.end(), objectLessThan);

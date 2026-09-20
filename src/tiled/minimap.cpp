@@ -35,6 +35,7 @@
 #include "zoomable.h"
 
 #include <QCursor>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QUndoStack>
@@ -211,6 +212,32 @@ void MiniMap::paintEvent(QPaintEvent *pe)
 
     QPainter p(this);
     p.setRenderHints(QPainter::SmoothPixmapTransform);
+
+    /*
+     * Rounded to match the dock that frames it. Clipped rather than merely
+     * drawn rounded, because the map image below is a straight blit - without
+     * a clip its square corners sit outside the curve and the rounding reads
+     * as a border drawn over a rectangle.
+     *
+     * Only the bottom corners: the dock's title bar covers the top two, and
+     * rounding those as well leaves two notches between the title and the map.
+     */
+    QPainterPath rounded;
+    const QRectF face = contentsRect();
+    constexpr qreal radius = 7.0;
+
+    rounded.moveTo(face.topLeft());
+    rounded.lineTo(face.topRight());
+    rounded.lineTo(face.right(), face.bottom() - radius);
+    rounded.quadTo(face.bottomRight(),
+                   QPointF(face.right() - radius, face.bottom()));
+    rounded.lineTo(face.left() + radius, face.bottom());
+    rounded.quadTo(face.bottomLeft(),
+                   QPointF(face.left(), face.bottom() - radius));
+    rounded.closeSubpath();
+
+    p.setClipPath(rounded);
+    p.setRenderHint(QPainter::Antialiasing, true);
 
     QColor backgroundColor(palette().dark().color());
     if (mMapDocument && mMapDocument->map()->backgroundColor().isValid())

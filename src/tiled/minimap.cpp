@@ -202,9 +202,26 @@ void MiniMap::paintEvent(QPaintEvent *pe)
 {
     QFrame::paintEvent(pe);
 
-    if (mRedrawMapImage) {
-        renderMapToImage();
-        mRedrawMapImage = false;
+    /*
+     * Queued, not rendered here: drawing every layer and object into the
+     * thumbnail measured 445ms on a 700x650 map, and a paint that long
+     * freezes the editor. The paint below uses whatever image exists, so a
+     * first open shows the minimap blank for a moment. 150ms not 0, to land
+     * after the open settles.
+     */
+    if (mRedrawMapImage && !mRenderQueued) {
+        mRenderQueued = true;
+
+        QTimer::singleShot(150, this, [this]() {
+            mRenderQueued = false;
+
+            if (!mRedrawMapImage)
+                return;
+
+            mRedrawMapImage = false;
+            renderMapToImage();
+            update();
+        });
     }
 
     if (mMapImage.isNull() || mImageRect.isEmpty())

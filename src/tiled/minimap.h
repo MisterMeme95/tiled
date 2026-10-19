@@ -70,6 +70,9 @@ private:
     QPoint mDragOffset;
     bool mMouseMoveCursorState;
     bool mRedrawMapImage;
+
+    /* A deferred renderMapToImage() is pending; see paintEvent(). */
+    bool mRenderQueued = false;
     MiniMapRenderer::RenderFlags mRenderFlags;
 
     /*

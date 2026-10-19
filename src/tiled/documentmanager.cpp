@@ -21,6 +21,10 @@
 
 #include "documentmanager.h"
 
+#include <QTimer>
+
+#include <QPointer>
+
 #include "abstracttool.h"
 #include "adjusttileindexes.h"
 #include "brokenlinks.h"
@@ -560,8 +564,26 @@ int DocumentManager::insertDocument(int index, const DocumentPtr &document)
     Document *documentPtr = document.data();
 
     if (auto mapDocument = qobject_cast<MapDocument*>(documentPtr)) {
-        for (const SharedTileset &tileset : mapDocument->map()->tilesets())
-            addToTilesetDocument(tileset, mapDocument);
+        /*
+         * Off by default - these exist for the tilesets dock, which this app
+         * does not use, and 172 of them cost ~375ms here plus more again in
+         * the layout and styling of the widgets they create.
+         *
+         * ATOMIX_TILESET_DOCS=1 restores it, deferred past the first paint.
+         * 50ms not 0: a zero timer beats the queued centerOn to it. QPointer
+         * so a closed document is not kept alive to be registered.
+         */
+        if (qEnvironmentVariableIntValue("ATOMIX_TILESET_DOCS") != 0) {
+            QPointer<MapDocument> guardedMapDocument(mapDocument);
+
+            QTimer::singleShot(50, this, [this, guardedMapDocument]() {
+                if (!guardedMapDocument)
+                    return;
+
+                for (const SharedTileset &tileset : guardedMapDocument->map()->tilesets())
+                    addToTilesetDocument(tileset, guardedMapDocument);
+            });
+        }
     } else if (auto tilesetDocument = qobject_cast<TilesetDocument*>(documentPtr)) {
         // We may have opened a bare tileset that wasn't seen before
         if (!mTilesetDocumentsModel->contains(tilesetDocument)) {
@@ -1246,6 +1268,11 @@ void DocumentManager::addToTilesetDocument(const SharedTileset &tileset, MapDocu
 void DocumentManager::removeFromTilesetDocument(const SharedTileset &tileset, MapDocument *mapDocument)
 {
     auto tilesetDocument = findTilesetDocument(tileset);
+
+    /* May not exist: registration above is off by default. */
+    if (!tilesetDocument)
+        return;
+
     auto tilesetDocumentPtr = tilesetDocument->sharedFromThis();    // keeps alive and may delete
 
     tilesetDocument->removeMapDocument(mapDocument);

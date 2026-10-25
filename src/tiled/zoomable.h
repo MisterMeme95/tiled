@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
+
 #include <QObject>
 #include <QRegularExpression>
 #include <QVector>
@@ -37,7 +39,7 @@ namespace Tiled {
  * A class that wants to be zoomable would aggregate this class, and connect
  * to the scaleChanged() signal in order to adapt to the new zoom factor.
  */
-class Zoomable : public QObject
+class TILED_EDITOR_EXPORT Zoomable : public QObject
 {
     Q_OBJECT
 

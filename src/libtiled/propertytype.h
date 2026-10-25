@@ -245,10 +245,11 @@ private:
     int mNextId = 0;
 
     /*
-     * Names to the types that carry them. findTypeByName() was a linear scan
-     * with a string compare per entry, and a project that publishes a type
-     * per atom makes that a scan of thousands - paid on every lookup, by the
-     * stamp, the eraser, the restack and the inspector alike.
+     * Names to the types that carry them. findTypeByName() and findClassFor()
+     * were linear scans with a string compare per entry, and a project that
+     * publishes a type per atom makes that a scan of thousands - paid on every
+     * lookup, by the stamp, the eraser, the restack and the inspector alike,
+     * and by every object repaint through MapObject::effectiveColors().
      *
      * A multi-hash because a name is not unique on its own: the same name can
      * be a class and an enum, and the usage flags are what tell them apart.

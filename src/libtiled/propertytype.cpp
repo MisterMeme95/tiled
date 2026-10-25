@@ -626,7 +626,11 @@ const PropertyType *PropertyTypes::findTypeByName(const QString &name, int usage
      * be seen from here - the index would hand back a type that no longer
      * goes by the name asked for, which is worse than not finding it.
      */
-    for (PropertyType *candidate : mNameIndex.values(name)) {
+    const auto last = mNameIndex.constEnd();
+
+    for (auto it = mNameIndex.constFind(name); it != last && it.key() == name; ++it) {
+        PropertyType *candidate = it.value();
+
         if (candidate->name == name &&
                 (typeUsageFlags(*candidate) & usageFlags) != 0)
             return candidate;
@@ -645,10 +649,32 @@ const ClassPropertyType *PropertyTypes::findClassFor(const QString &name, const 
     if (name.isEmpty())
         return nullptr;
 
-    auto it = std::find_if(begin(), end(), [&] (const SharedPropertyType &type) {
-        return type->name == name && type->isClass() && static_cast<const ClassPropertyType&>(*type).isClassFor(object);
-    });
-    return static_cast<const ClassPropertyType*>(it == end() ? nullptr : it->data());
+    if (mNameIndexDirty)
+        rebuildNameIndex();
+
+    /*
+     * Through the index, like findTypeByName - and for the same reason twice
+     * over, because this one could not short-circuit at all.
+     *
+     * isClassFor() tests the class's usage against the object asking, and a
+     * project that publishes its turfs with TileClass alone has no match for
+     * a MapObject carrying a turf's name. The scan then ran to the end of
+     * every published type on every call, and MapObject::effectiveColors()
+     * calls this once per object per paint: measured at 1.1ms for each turf
+     * written as an object, against 0.2ms for an /obj whose class the scan
+     * reached and stopped at.
+     */
+    const auto last = mNameIndex.constEnd();
+
+    for (auto it = mNameIndex.constFind(name); it != last && it.key() == name; ++it) {
+        const PropertyType *candidate = it.value();
+
+        if (candidate->name == name && candidate->isClass() &&
+                static_cast<const ClassPropertyType*>(candidate)->isClassFor(object))
+            return static_cast<const ClassPropertyType*>(candidate);
+    }
+
+    return nullptr;
 }
 
 PropertyType *PropertyTypes::findTypeByNamePriv(const QString &name, int usageFlags)

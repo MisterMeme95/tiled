@@ -512,6 +512,7 @@ void PropertyTypes::merge(PropertyTypes typesToMerge)
             // Existing types are replaced, but their ID is retained
             typeToImport->id = (*existingIt)->id;
             *existingIt = typeToImport;
+            mNameIndexDirty = true;    // replaced in place, so add() missed it
         } else {
             // New types are added, but their ID is reset
             typeToImport->id = 0;
@@ -559,6 +560,7 @@ void PropertyTypes::mergeObjectTypes(const QVector<ObjectType> &objectTypes)
             // Replace existing classes, but retain their ID
             propertyType->id = (*existingIt)->id;
             *existingIt = SharedPropertyType(propertyType.release());
+            mNameIndexDirty = true;    // replaced in place, so add() missed it
         } else {
             add(SharedPropertyType(propertyType.release()));
         }
@@ -597,15 +599,40 @@ const PropertyType *PropertyTypes::findTypeById(int typeId) const
  * Returns a pointer to the PropertyType matching the given \a name and
  * \a usageFlags, or nullptr if it can't be found.
  */
+void PropertyTypes::rebuildNameIndex() const
+{
+    mNameIndex.clear();
+    mNameIndex.reserve(mTypes.size());
+
+    for (const SharedPropertyType &type : mTypes)
+        mNameIndex.insert(type->name, type.data());
+
+    mNameIndexDirty = false;
+}
+
 const PropertyType *PropertyTypes::findTypeByName(const QString &name, int usageFlags) const
 {
     if (name.isEmpty())
         return nullptr;
 
-    auto it = std::find_if(begin(), end(), [&] (const SharedPropertyType &type) {
-        return type->name == name && (typeUsageFlags(*type) & usageFlags) != 0;
-    });
-    return it == end() ? nullptr : it->data();
+    if (mNameIndexDirty)
+        rebuildNameIndex();
+
+    /*
+     * The name alone does not answer it: the same name can be a class and an
+     * enum, so the candidates it finds are still filtered by usage.
+     *
+     * The name is re-checked as well, because a type RENAMED in place cannot
+     * be seen from here - the index would hand back a type that no longer
+     * goes by the name asked for, which is worse than not finding it.
+     */
+    for (PropertyType *candidate : mNameIndex.values(name)) {
+        if (candidate->name == name &&
+                (typeUsageFlags(*candidate) & usageFlags) != 0)
+            return candidate;
+    }
+
+    return nullptr;
 }
 
 const PropertyType *PropertyTypes::findPropertyValueType(const QString &name) const

@@ -47,6 +47,10 @@ void ScriptPropertyType::setName(const QString &name)
     }
 
     mType->name = name;
+
+    /* Renamed in place, which PropertyTypes cannot see. */
+    project.propertyTypes()->invalidateNameIndex();
+
     applyPropertyChanges();
 }
 

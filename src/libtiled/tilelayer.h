@@ -536,8 +536,19 @@ private:
     int mHeight;
     QHash<QPoint, Chunk> mChunks;
     QRect mBounds;
+    /*
+     * A SUPERSET of the tilesets in use: an arrival is added at once, a
+     * departure is only suspected. mUsedTilesetsDirty says a departure may
+     * have happened, and usedTilesets() settles it by scanning - which is
+     * why nothing on an edit path should ask it.
+     */
     mutable QSet<SharedTileset> mUsedTilesets;
     mutable bool mUsedTilesetsDirty;
+
+    /* drawMargins() measures the superset, so it costs a scan of the
+     * tilesets at worst and nothing at all while they do not change. */
+    mutable QMargins mDrawMargins;
+    mutable bool mDrawMarginsDirty = true;
 };
 
 inline QPoint TileLayer::iterator::key() const

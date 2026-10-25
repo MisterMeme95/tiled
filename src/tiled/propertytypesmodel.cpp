@@ -120,6 +120,11 @@ bool PropertyTypesModel::setPropertyTypeName(int row, const QString &name)
     const int moveToRow = newRow > row ? newRow - 1 : newRow;
 
     propertyType.name = typeWithName->name;
+
+    /* Renamed in place, which PropertyTypes cannot see - its name index has
+     * to be told. */
+    propertyTypes.invalidateNameIndex();
+
     const auto index = this->index(row);
     emit nameChanged(index, propertyTypes.typeAt(row));
     emit dataChanged(index, index, { Qt::DisplayRole, Qt::EditRole });

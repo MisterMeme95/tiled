@@ -172,7 +172,26 @@ static QMargins computeDrawMargins(const QSet<SharedTileset> &tilesets)
 
 QMargins TileLayer::drawMargins() const
 {
-    return computeDrawMargins(usedTilesets());
+    /*
+     * From mUsedTilesets directly, NOT through usedTilesets(). That one
+     * rescans every chunk of the layer whenever a tile has been overwritten
+     * or erased, and this is asked on both sides of every single-cell edit -
+     * which on a 57,000 cell layer cost 11ms a tile while painting.
+     *
+     * mUsedTilesets is kept a SUPERSET of what is really in use: a tileset
+     * that arrives is added at once, one whose last tile goes is left in
+     * until somebody asks a question that has to be exact. Margins from a
+     * superset are never too small, and too small is the only way they can
+     * be wrong - they say how far outside a cell the renderer repaints, so
+     * erring large costs a little paint and erring small leaves the top of a
+     * tall tile behind.
+     */
+    if (mDrawMarginsDirty) {
+        mDrawMargins = computeDrawMargins(mUsedTilesets);
+        mDrawMarginsDirty = false;
+    }
+
+    return mDrawMargins;
 }
 
 /**
@@ -211,15 +230,24 @@ void Tiled::TileLayer::setCell(int x, int y, const Cell &cell)
 
     Chunk &_chunk = chunk(x, y);
 
-    if (!mUsedTilesetsDirty) {
-        Tileset *oldTileset = _chunk.cellAt(x & CHUNK_MASK, y & CHUNK_MASK).tileset();
-        Tileset *newTileset = cell.tileset();
-        if (oldTileset != newTileset) {
-            if (oldTileset)
-                mUsedTilesetsDirty = true;
-            else if (newTileset)
-                mUsedTilesets.insert(newTileset->sharedFromThis());
+    /*
+     * Tracked even once dirty, because the set has to stay a superset: it is
+     * what drawMargins() measures, and a tileset that arrived while the set
+     * was stale would leave the margins too small for it.
+     */
+    Tileset *oldTileset = _chunk.cellAt(x & CHUNK_MASK, y & CHUNK_MASK).tileset();
+    Tileset *newTileset = cell.tileset();
+
+    if (oldTileset != newTileset) {
+        if (newTileset && !mUsedTilesets.contains(newTileset->sharedFromThis())) {
+            mUsedTilesets.insert(newTileset->sharedFromThis());
+            mDrawMarginsDirty = true;       // may have to grow for it
         }
+
+        /* The old one may have had its last tile here - may, because only a
+         * scan can say, and that is what usedTilesets() is for. */
+        if (oldTileset)
+            mUsedTilesetsDirty = true;
     }
 
     _chunk.setCell(x & CHUNK_MASK, y & CHUNK_MASK, cell);
@@ -308,6 +336,7 @@ void TileLayer::clear()
     mBounds = QRect();
     mUsedTilesets.clear();
     mUsedTilesetsDirty = false;
+    mDrawMarginsDirty = true;
 }
 
 void TileLayer::flip(FlipDirection direction)
@@ -559,6 +588,10 @@ QSet<SharedTileset> TileLayer::usedTilesets() const
 
         mUsedTilesets.swap(tilesets);
         mUsedTilesetsDirty = false;
+
+        /* Exact again, so the margins may now shrink - they were holding a
+         * superset's worth. */
+        mDrawMarginsDirty = true;
     }
 
     return mUsedTilesets;
@@ -585,6 +618,7 @@ void TileLayer::removeReferencesToTileset(Tileset *tileset)
         chunk.removeReferencesToTileset(tileset);
 
     mUsedTilesets.remove(tileset->sharedFromThis());
+    mDrawMarginsDirty = true;
 }
 
 void TileLayer::replaceReferencesToTileset(Tileset *oldTileset,
@@ -595,6 +629,8 @@ void TileLayer::replaceReferencesToTileset(Tileset *oldTileset,
 
     if (mUsedTilesets.remove(oldTileset->sharedFromThis()))
         mUsedTilesets.insert(newTileset->sharedFromThis());
+
+    mDrawMarginsDirty = true;
 }
 
 void TileLayer::resize(QSize size, QPoint offset)
@@ -614,6 +650,7 @@ void TileLayer::resize(QSize size, QPoint offset)
     mBounds = newLayer->mBounds;
     mUsedTilesets = newLayer->mUsedTilesets;
     mUsedTilesetsDirty = newLayer->mUsedTilesetsDirty;
+    mDrawMarginsDirty = true;
     setSize(size);
 }
 
@@ -659,6 +696,7 @@ void TileLayer::offsetTiles(QPoint offset,
     mBounds = newLayer->mBounds;
     mUsedTilesets = newLayer->mUsedTilesets;
     mUsedTilesetsDirty = newLayer->mUsedTilesetsDirty;
+    mDrawMarginsDirty = true;
 }
 
 void TileLayer::offsetTiles(QPoint offset)

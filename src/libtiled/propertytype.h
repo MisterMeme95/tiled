@@ -29,6 +29,7 @@
 #pragma once
 
 #include <QColor>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMetaType>
@@ -205,6 +206,13 @@ public:
 
     int findIndexByName(const QString &name) const;
 
+    /*
+     * Forget the name index. Only needed when a type already in here is
+     * RENAMED, which this class cannot see: every other way the set changes
+     * goes through a member below and invalidates as it goes.
+     */
+    void invalidateNameIndex();
+
     const PropertyType *findTypeById(int typeId) const;
     const PropertyType *findTypeByName(const QString &name, int usageFlags = ClassPropertyType::AnyUsage) const;
     const PropertyType *findPropertyValueType(const QString &name) const;
@@ -231,8 +239,24 @@ private:
     PropertyType *findTypeByNamePriv(const QString &name, int usageFlags = ClassPropertyType::AnyUsage);
     PropertyType *findPropertyValueTypePriv(const QString &name);
 
+    void rebuildNameIndex() const;
+
     Types mTypes;
     int mNextId = 0;
+
+    /*
+     * Names to the types that carry them. findTypeByName() was a linear scan
+     * with a string compare per entry, and a project that publishes a type
+     * per atom makes that a scan of thousands - paid on every lookup, by the
+     * stamp, the eraser, the restack and the inspector alike.
+     *
+     * A multi-hash because a name is not unique on its own: the same name can
+     * be a class and an enum, and the usage flags are what tell them apart.
+     * Built on demand so a load that adds a thousand types builds it once, at
+     * the first question rather than on every add.
+     */
+    mutable QMultiHash<QString, PropertyType *> mNameIndex;
+    mutable bool mNameIndexDirty = true;
 };
 
 inline PropertyType &PropertyTypes::add(const SharedPropertyType &type)
@@ -243,12 +267,14 @@ inline PropertyType &PropertyTypes::add(const SharedPropertyType &type)
         mNextId = std::max(mNextId, type->id);
 
     mTypes.append(type);
+    mNameIndexDirty = true;
     return *mTypes.last();
 }
 
 inline void PropertyTypes::clear()
 {
     mTypes.clear();
+    mNameIndexDirty = true;
 }
 
 inline size_t PropertyTypes::count() const
@@ -259,10 +285,12 @@ inline size_t PropertyTypes::count() const
 inline void PropertyTypes::removeAt(int index)
 {
     mTypes.removeAt(index);
+    mNameIndexDirty = true;
 }
 
 inline SharedPropertyType PropertyTypes::takeAt(int index)
 {
+    mNameIndexDirty = true;
     return mTypes.takeAt(index);
 }
 
@@ -273,7 +301,14 @@ inline PropertyType &PropertyTypes::typeAt(int index)
 
 inline void PropertyTypes::moveType(int from, int to)
 {
+    /* No invalidation: the index maps a name to the type itself, so moving
+     * one within the list leaves every entry still true. */
     mTypes.move(from, to);
+}
+
+inline void PropertyTypes::invalidateNameIndex()
+{
+    mNameIndexDirty = true;
 }
 
 using SharedPropertyTypes = QSharedPointer<PropertyTypes>;

@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
+
 #include <QPoint>
 #include <QRegion>
 #include <QTransform>
@@ -32,7 +34,7 @@ namespace Tiled {
 QVector<QPoint> pointsOnEllipse(int xm, int ym, int a, int b);
 QRegion ellipseRegion(int x0, int y0, int x1, int y1);
 QRegion ellipseRegion(QRect rect);
-QVector<QPoint> pointsOnLine(int x0, int y0, int x1, int y1, bool manhattan = false);
+TILED_EDITOR_EXPORT QVector<QPoint> pointsOnLine(int x0, int y0, int x1, int y1, bool manhattan = false);
 
 inline QVector<QPoint> pointsOnEllipse(QPoint center, int radiusX, int radiusY)
 { return pointsOnEllipse(center.x(), center.y(), radiusX, radiusY); }

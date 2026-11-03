@@ -22,6 +22,7 @@
 #pragma once
 
 #include "minimaprenderer.h"
+#include "tilededitor_global.h"
 
 #include <QFrame>
 #include <QHash>
@@ -33,7 +34,7 @@ namespace Tiled {
 class MapDocument;
 class MapObject;
 
-class MiniMap : public QFrame
+class TILED_EDITOR_EXPORT MiniMap : public QFrame
 {
     Q_OBJECT
 

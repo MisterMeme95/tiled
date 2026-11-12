@@ -599,7 +599,23 @@ void WangDock::setCurrentWangSet(WangSet *wangSet)
         if (!mWangTemplateView->isVisible() && !mWangColorView->isVisible())
             setColorView();
 
-        if (wangSet->colorCount() > 0 && !mWangTemplateView->isVisible()) {
+        /*
+         * mWangColorModel, not just the colour count.
+         *
+         * It is set to null a few lines up and only filled in when a
+         * TilesetDocument already exists for the set's tileset. Coming from
+         * DocumentManager::addDocument that is not yet true: the dock is
+         * reached through insertDocument -> currentIndexChanged before
+         * addDocument gets to its addToTilesetDocument loop, so a map whose
+         * tileset already carries a wang set arrives here with no model and
+         * dereferences null.
+         *
+         * Never seen upstream because a map usually acquires its wang sets
+         * from a tileset the user opened first, by which point the document
+         * exists.
+         */
+        if (mWangColorModel && wangSet->colorCount() > 0 &&
+            !mWangTemplateView->isVisible()) {
             const QModelIndex index = mWangColorModel->colorIndex(1);
             mWangColorView->setCurrentIndex(static_cast<QAbstractProxyModel*>(mWangColorView->model())->mapFromSource(index));
         }

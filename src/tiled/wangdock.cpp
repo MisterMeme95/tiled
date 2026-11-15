@@ -52,6 +52,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QScopedValueRollback>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QLabel>
 
@@ -594,7 +595,13 @@ void WangDock::setCurrentWangSet(WangSet *wangSet)
     activateErase();
 
     if (wangSet) {
-        mWangSetView->setCurrentIndex(wangSetIndex(wangSet));
+        /* Signals off: with no TilesetDocument wangSetIndex() is invalid, so
+         * currentRowChanged re-enters and clears mCurrentWangSet under us. */
+        {
+            const QSignalBlocker blocker(mWangSetView->selectionModel());
+
+            mWangSetView->setCurrentIndex(wangSetIndex(wangSet));
+        }
 
         if (!mWangTemplateView->isVisible() && !mWangColorView->isVisible())
             setColorView();
@@ -653,7 +660,10 @@ void WangDock::activateErase()
 
 void WangDock::updateAddColorStatus()
 {
-    mAddColor->setEnabled(mCurrentWangSet->colorCount() < WangId::MAX_COLOR_COUNT);
+    /* Null between sets: wangSetChanged() reaches here with both pointers
+     * null, since its early return only fires when they DIFFER. */
+    mAddColor->setEnabled(mCurrentWangSet &&
+                          mCurrentWangSet->colorCount() < WangId::MAX_COLOR_COUNT);
 }
 
 void WangDock::retranslateUi()

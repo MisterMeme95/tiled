@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "tilededitor_global.h"
+
 #include "grid.h"
 #include "wangset.h"
 
@@ -43,7 +45,7 @@ class HexagonalRenderer;
  * Optionally when choosing cells, this will look at adjacent cells
  * to ensure that they will be able to be filled based on the chosen cell.
  */
-class WangFiller
+class TILED_EDITOR_EXPORT WangFiller
 {
 public:
     struct CellInfo {

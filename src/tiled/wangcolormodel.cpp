@@ -40,6 +40,8 @@ WangColorModel::WangColorModel(TilesetDocument *tilesetDocument,
     , mTilesetDocument(tilesetDocument)
     , mWangSet(wangSet)
 {
+}
+
 QModelIndex WangColorModel::colorIndex(int color) const
 {
     if (!mWangSet || color > mWangSet->colorCount())
